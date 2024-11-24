@@ -17,7 +17,7 @@ baud_rate = 115200
 # Create the GUI window
 gui = Tk()
 gui.title("Sensor Reader")
-gui.geometry("400x550")
+gui.geometry("400x600")
 
 # Create a frame to hold the Text widget and scrollbar
 frame = Frame(gui)
@@ -46,7 +46,6 @@ def toggle_enable():
     read_enable = not read_enable
     if read_enable:
         start_btn.config(text="Reading Sensor Data. Click to Stop Sensor Read")
-
         # Start the background thread only if it's not already running
         if not (sensor_thread and sensor_thread.is_alive()):
             sensor_thread = threading.Thread(target=read_sensor_data, daemon=True)
@@ -60,22 +59,22 @@ def read_sensor_data():
     if stm32_port is None:
         display_message("No Device Found")
         return
-
-    try:
-        with serial.Serial(stm32_port, baud_rate) as s, open("voltage_data.txt", "a") as file:
-            display_message(f"Serial port {stm32_port} is open.")
-            while read_enable:
-                if s.in_waiting:
-                    response = s.readline().strip()
-                    try:
-                        adc_val = int(response.decode('utf-8', errors='ignore'))
-                        voltage = (VRef * adc_val / resolution) - 2
-                        file.write(f"{voltage:.3f}\n")
-                        display_message(f"Voltage = {voltage:.3f} V")
-                    except ValueError:
-                        display_message(f"Invalid data received: {response}")
-    except serial.SerialException as e:
-        display_message(f"Serial error: {e}")
+    else:
+        try:
+            with serial.Serial(stm32_port, baud_rate) as s, open("voltage_data.txt", "a") as file:
+                display_message(f"Serial port {stm32_port} is open.")
+                while read_enable:
+                    if s.in_waiting:
+                        response = s.readline().strip()
+                        try:
+                            adc_val = int(response.decode('utf-8', errors='ignore'))
+                            voltage = (VRef * adc_val / resolution) - 2
+                            file.write(f"{voltage:.3f}\n")
+                            display_message(f"Voltage = {voltage:.3f} V")
+                        except ValueError:
+                            display_message(f"Invalid data received: {response}")
+        except serial.SerialException as e:
+            display_message(f"Serial error: {e}")
 
 # Display message in the Text widget
 def display_message(message):
@@ -109,28 +108,17 @@ def export_saveas_excel():
 
             # Open the text file and process each line
             with open("voltage_data.txt", "r") as file:
-                chunk = []
-                chunk_size = 10000  # Write in chunks to improve performance
-                row_start = 1  # Start writing from the second row
 
                 for i, line in enumerate(file):
                     try:
                         voltage = float(line.strip())
-                        chunk.append([voltage])
                     except ValueError:
                         display_message(f"Skipping invalid line {i + 1}: {line.strip()}")
 
                     # Write the chunk to Excel when chunk_size is reached
-                    if len(chunk) == chunk_size:
-                        df = pd.DataFrame(chunk, columns=["Voltage (V)"])
-                        df.to_excel(writer, index=False, header=False, startrow=row_start)
-                        row_start += len(chunk)
-                        chunk = []
+                        df = pd.DataFrame(voltage, columns=["Voltage (V)"])
+                        df.to_excel(writer, index=True, header=False)
 
-                # Write any remaining data
-                if chunk:
-                    df = pd.DataFrame(chunk, columns=["Voltage (V)"])
-                    df.to_excel(writer, index=False, header=False, startrow=row_start)
         display_message(f"Data exported to {file_path}")
     except FileNotFoundError:
         display_message("Text file not found.")
@@ -159,28 +147,16 @@ def export_openas_excel():
 
             # Open the text file and process each line
             with open("voltage_data.txt", "r") as file:
-                chunk = []
-                chunk_size = 10000  # Write in chunks to improve performance
-                row_start = 1  # Start writing from the second row
 
                 for i, line in enumerate(file):
                     try:
                         voltage = float(line.strip())
-                        chunk.append([voltage])
                     except ValueError:
                         display_message(f"Skipping invalid line {i + 1}: {line.strip()}")
 
                     # Write the chunk to Excel when chunk_size is reached
-                    if len(chunk) == chunk_size:
-                        df = pd.DataFrame(chunk, columns=["Voltage (V)"])
-                        df.to_excel(writer, index=True, header=False, startrow=row_start)
-                        row_start += len(chunk)
-                        chunk = []
-
-                # Write any remaining data
-                if chunk:
-                    df = pd.DataFrame(chunk, columns=["Voltage (V)"])
-                    df.to_excel(writer, index=False, header=False, startrow=row_start)
+                        df = pd.DataFrame(voltage, columns=["Voltage (V)"])
+                        df.to_excel(writer, index=True, header=False)
 
         display_message(f"Data exported to {file_path}")
 
@@ -192,21 +168,27 @@ def export_openas_excel():
         display_message(f"An error occurred: {e}")
         
 def connect_mcu():
+    global stm32_port
+    ports = serial.tools.list_ports.comports()
     if stm32_port is None:
         for port, desc, hwid in sorted(ports):
-            if "STM32" in desc:
+            if "STM" in desc:
                 stm32_port = port
-                display_message(f"STM32 port is {stm32_port}")
+                display_message(f"STM32 port is {stm32_port}.\nMicrocontroller Connected")
                 break
+        
+        if(stm32_port is None):
+            display_message("Microcontroller Not Found")
     else:
         display_message("Microcontroller Already Connected")
 
 # Identify STM32 port
 for port, desc, hwid in sorted(ports):
-    if "STM32" in desc:
+    if "STM" in desc:
         stm32_port = port
-        display_message(f"STM32 port is {stm32_port}")
+        display_message(f"STM32 port is {stm32_port}.\nMicrocontroller Connected")
         break
+display_message("Microcontroller Not Found")
 
 with open("voltage_data.txt", "w") as file:
         pass
