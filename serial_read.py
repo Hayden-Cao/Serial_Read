@@ -53,7 +53,7 @@ def main():
 
     # Check for initial STM32 connection
     initialize_stm32_connection()
-
+    display_message("Voltages Displayed May be Delayed")
     # Run the GUI main loop
     gui.mainloop()
 
@@ -87,6 +87,19 @@ def read_sensor_data():
                         display_message(f"Voltage = {voltage:.3f} V")
                     except ValueError:
                         display_message(f"Invalid data received: {response}")
+            
+            if s.in_waiting:
+                display_message("Stop Request Receieved. Data logging still in progress")
+                display_message("Do not export or save until data logging is complete")
+                while s.in_waiting:
+                    try:
+                        adc_val = int(response.decode('utf-8', errors='ignore'))
+                        voltage = (VRef * adc_val / resolution) - 2
+                        file.write(f"{voltage:.3f}\n")
+                        #display_message(f"Voltage = {voltage:.3f} V")
+                    except ValueError:
+                        display_message(f"Invalid data received: {response}")
+                display_message("Data Logging is Complete")   
     except serial.SerialException as e:
         display_message(f"Serial error: {e}")
 
@@ -112,7 +125,7 @@ def export_saveas_excel():
 
         # Read data from text file
         with open("voltage_data.txt", "r") as file:
-            data = [float(line.strip()) for line in file if line.strip().isdigit()]
+            data = [float(line.strip()) for line in file if line.strip()]
 
         # Create a DataFrame with proper index
         df = pd.DataFrame(data, columns=["Voltage (V)"])
@@ -136,7 +149,7 @@ def export_openas_excel():
 
         # Read data from text file
         with open("voltage_data.txt", "r") as file:
-            data = [float(line.strip()) for line in file if line.strip().isdigit()]
+            data = [float(line.strip()) for line in file if line.strip()]
 
         # Open the existing Excel file and append data
         existing_df = pd.read_excel(file_path, engine='openpyxl', index_col=0)
