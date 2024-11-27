@@ -19,13 +19,13 @@ def main():
     # Initialize the GUI
     gui = Tk()
     gui.title("Sensor Reader")
-    gui.geometry("400x600")
+    gui.geometry("600x600")
     
     # Create the text display area
     frame = Frame(gui)
     frame.pack(pady=20)
 
-    text_widget = Text(frame, width=40, height=15)
+    text_widget = Text(frame, width=60, height=15)
     text_widget.pack(side=LEFT, fill=BOTH, expand=True)
 
     scrollbar = Scrollbar(frame, command=text_widget.yview)
@@ -91,14 +91,14 @@ def read_sensor_data():
             if s.in_waiting:
                 display_message("Stop Request Receieved. Data logging still in progress")
                 display_message("Do not export or save until data logging is complete")
-                while s.in_waiting:
-                    try:
-                        adc_val = int(response.decode('utf-8', errors='ignore'))
-                        voltage = (VRef * adc_val / resolution) - 2
-                        file.write(f"{voltage:.3f}\n")
-                        #display_message(f"Voltage = {voltage:.3f} V")
-                    except ValueError:
-                        display_message(f"Invalid data received: {response}")
+                try:
+                    response = s.readline(s.in_waiting).strip()
+                    adc_val = int(response.decode('utf-8', errors='ignore'))
+                    voltage = (VRef * adc_val / resolution) - 2
+                    file.write(f"{voltage:.3f}\n")
+                    #display_message(f"Voltage = {voltage:.3f} V")
+                except ValueError:
+                    display_message(f"Invalid data received: {response}")
                 display_message("Data Logging is Complete")   
     except serial.SerialException as e:
         display_message(f"Serial error: {e}")
@@ -123,15 +123,11 @@ def export_saveas_excel():
             display_message("Export cancelled.")
             return
 
-        # Read data from text file
         with open("voltage_data.txt", "r") as file:
             data = [float(line.strip()) for line in file if line.strip()]
 
-        # Create a DataFrame with proper index
         df = pd.DataFrame(data, columns=["Voltage (V)"])
-
-        # Export to Excel
-        df.to_excel(file_path, index=True)  # index=True keeps the natural indices
+        df.to_excel(file_path, index=True)
         display_message(f"Data exported to {file_path}")
     except Exception as e:
         display_message(f"An error occurred: {e}")
@@ -147,18 +143,12 @@ def export_openas_excel():
             display_message("Export cancelled.")
             return
 
-        # Read data from text file
         with open("voltage_data.txt", "r") as file:
             data = [float(line.strip()) for line in file if line.strip()]
 
-        # Open the existing Excel file and append data
-        existing_df = pd.read_excel(file_path, engine='openpyxl', index_col=0)
-        new_df = pd.DataFrame(data, columns=["Voltage (V)"])
-        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-
-        # Export back to Excel
-        combined_df.to_excel(file_path, index=True)  # index=True keeps unique indices
-        display_message(f"Data appended and exported to {file_path}")
+        df = pd.DataFrame(data, columns=["Voltage (V)"])
+        df.to_excel(file_path, index=True)
+        display_message(f"Data exported to {file_path}")
     except Exception as e:
         display_message(f"An error occurred: {e}")
 
